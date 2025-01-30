@@ -7,14 +7,14 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-14  # Вказуємо новішу версію macOS для сумісності з Xcode
 
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
-    - name: Install Fastlane
-      run: gem install fastlane
+    - name: Check Xcode version
+      run: xcodebuild -version  # Перевіряємо версію Xcode, щоб знати, що використовує CI
 
     - name: Decode and Install Certificate
       run: |
@@ -24,7 +24,6 @@ jobs:
         security unlock-keychain -p "" build.keychain
         security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
         security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
-
       env:
         DISTRIBUTION_P12: ${{ secrets.DISTRIBUTION_P12 }}
         P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
@@ -33,19 +32,21 @@ jobs:
       run: |
         mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
         echo "$PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
-
       env:
         PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE }}
 
+    - name: Install Fastlane
+      run: gem install fastlane -NV  # Встановлюємо Fastlane для автоматизації підпису
+
     - name: Build and Archive
       run: |
-        xcodebuild -project dictionaryApp.xcodeproj \
+        xcodebuild -workspace dictionaryApp.xcworkspace \
                    -scheme dictionaryApp \
                    -sdk iphoneos \
                    -configuration Release \
                    CODE_SIGN_STYLE=Manual \
-                   CODE_SIGN_IDENTITY="Apple Distribution: Ivan Dovhosheia (KZNP8PH94C)" \
-                   PROVISIONING_PROFILE_SPECIFIER="wellbe_dictionaryApp_AppStore" \
+                   "CODE_SIGN_IDENTITY=Apple Distribution: Ivan Dovhosheia (KZNP8PH94C)" \
+                   PROVISIONING_PROFILE_SPECIFIER=wellbe_dictionaryApp_AppStore \
                    archive -archivePath $GITHUB_WORKSPACE/build/dictionaryApp.xcarchive
 
     - name: Export IPA
@@ -56,7 +57,7 @@ jobs:
                    -exportPath $GITHUB_WORKSPACE/build
 
     - name: Upload IPA as Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v4  # Оновлено на нову версію
       with:
         name: dictionaryApp
         path: $GITHUB_WORKSPACE/build/dictionaryApp.ipa
