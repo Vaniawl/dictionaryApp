@@ -1,0 +1,56 @@
+name: iOS Build and Sign
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Decode and Install Certificate
+      run: |
+        echo "$DISTRIBUTION_P12" | base64 --decode > certificate.p12
+        security create-keychain -p "" build.keychain
+        security default-keychain -s build.keychain
+        security unlock-keychain -p "" build.keychain
+        security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
+        security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+
+      env:
+        DISTRIBUTION_P12: ${{ secrets.DISTRIBUTION_P12 }}
+        P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+
+        
+    - name: Decode and Install Provisioning Profile
+      run: |
+        echo "$PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+
+      env:
+        PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE }}
+
+    - name: Build and Archive
+      run: |
+        xcodebuild -workspace YourApp.xcworkspace \
+                   -scheme YourApp \
+                   -sdk iphoneos \
+                   -configuration Release \
+                   archive -archivePath $GITHUB_WORKSPACE/build/YourApp.xcarchive
+
+    - name: Export IPA
+      run: |
+        xcodebuild -exportArchive \
+                   -archivePath $GITHUB_WORKSPACE/build/YourApp.xcarchive \
+                   -exportOptionsPlist exportOptions.plist \
+                   -exportPath $GITHUB_WORKSPACE/build
+
+    - name: Upload IPA as Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: YourApp
+        path: $GITHUB_WORKSPACE/build/YourApp.ipa
