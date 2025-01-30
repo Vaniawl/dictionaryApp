@@ -39,7 +39,7 @@ jobs:
 
     - name: Build and Archive
       run: |
-        xcodebuild -workspace dictionaryApp.xcworkspace \
+        xcodebuild -project dictionaryApp.xcodeproj \
                    -scheme dictionaryApp \
                    -sdk iphoneos \
                    -configuration Release \
